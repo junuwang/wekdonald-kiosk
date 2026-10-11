@@ -28,12 +28,14 @@
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
 .wrap{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:minmax(0,560px) 340px;justify-content:center;gap:20px;align-items:start}
-@media (max-width:980px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.monbtn{display:none;position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:5;font-size:12px;padding:.5em .9em;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+@media (max-width:980px){.wrap{grid-template-columns:minmax(0,1fr)} .mon{display:none} .mon.show{display:grid} .monbtn{display:inline-flex}}
 button,input{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 
 /* ---------- kiosk ---------- */
-.kiosk{--scale:1;font-size:calc(16px * var(--scale));background:var(--surface);color:var(--ink);border:var(--bw) solid var(--line);border-radius:28px;overflow:hidden;display:flex;flex-direction:column;min-height:960px;min-width:0;box-shadow:0 20px 50px rgba(0,0,0,.18)}
+.kiosk{--scale:1;font-size:calc(clamp(14px, 3.3vw, 16px) * var(--scale));background:var(--surface);color:var(--ink);border:var(--bw) solid var(--line);border-radius:28px;overflow:hidden;display:flex;flex-direction:column;min-height:min(960px, calc(100dvh - 40px));min-width:0;box-shadow:0 20px 50px rgba(0,0,0,.18)}
+@media (max-width:980px){body{padding-inline:8px;padding-block:8px 60px}.kiosk{border-radius:18px;min-height:calc(100dvh - 16px)}}
 .kiosk[data-big="1"]{--scale:1.28}
 .k-top{display:flex;flex-wrap:wrap;align-items:center;gap:.6em;padding:.8em 1em;border-bottom:var(--bw) solid var(--line);background:var(--surface-2)}
 .brand{font-family:var(--display);font-size:1.45em;letter-spacing:.01em;display:flex;align-items:center;gap:.4em;margin-right:auto;flex-basis:100%}
@@ -109,8 +111,14 @@ button,input{font:inherit;color:inherit}
 .cart{border-top:var(--bw) solid var(--line);padding-top:.9em;display:grid;gap:.4em}
 .cart h3{margin:0;font-size:1em;color:var(--muted);font-weight:500;display:flex;justify-content:space-between}
 .cart ul{list-style:none;margin:0;padding:0;display:grid;gap:.35em}
-.cart li{display:flex;justify-content:space-between;gap:1em;font-size:1.08em}
+.cart li{display:flex;justify-content:space-between;align-items:center;gap:1em;font-size:1.08em}
+.cart li>span:last-child{display:flex;align-items:center;flex-shrink:0}
 .cart li small{display:block;color:var(--muted);font-size:.85em}
+.stepper{display:flex;align-items:center;gap:.6em;margin-top:.4em}
+.stepper .st,.cart .cq{width:2.4em;height:2.4em;border-radius:50%;border:var(--bw) solid var(--ink);background:var(--surface);color:var(--ink);font-size:1.2em;font-weight:700;cursor:pointer;line-height:1}
+.cart .cq{width:1.8em;height:1.8em;font-size:1em;margin:0 .15em}
+.stepper #qtyv{font-size:1.3em;font-weight:700;min-width:2.5em;text-align:center}
+.stepper .price{color:var(--muted);margin-left:.4em}
 .cart .rm{margin-left:.5em;font-size:.78em;padding:.15em .55em;border-radius:6px;border:var(--bw) solid var(--alert);background:transparent;color:var(--alert);cursor:pointer;font-weight:700}
 .cart .tot{display:flex;justify-content:space-between;font-size:1.35em;font-weight:700;border-top:1px dashed var(--line);padding-top:.4em}
 .num{font-variant-numeric:tabular-nums}
@@ -164,6 +172,7 @@ button,input{font:inherit;color:inherit}
 .risk b{color:var(--ink);font-weight:500}
 </style>
 
+<button class="monbtn" id="monbtn">운영 모니터 보기</button>
 <div class="wrap">
   <section class="kiosk" id="kiosk" aria-label="키오스크">
     <div class="k-top">
@@ -196,6 +205,7 @@ button,input{font:inherit;color:inherit}
       <h4>대화 단계</h4>
       <span class="state" id="mState">START</span>
       <span id="mFails" style="margin-left:8px;color:var(--muted)"></span>
+      <div class="kv" style="margin-top:6px;align-items:center"><span>안내 음성</span><select id="mVoice" style="max-width:190px;font-size:11px"></select></div>
       <div class="kv" style="margin-top:6px"><span>브라우저</span><span id="mBrowser" style="text-align:right">—</span></div>
       <div class="kv" style="margin-top:6px"><span>해석 엔진</span><span id="mLLM" style="text-align:right">확인 중</span></div>
       <div id="mWeb" hidden style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -351,8 +361,8 @@ function extract(raw){
   if (/^(맨)?마지막|^끝에?(거|것)?/.test(t)) e.pick = -1;
   if (/^(그거|그걸로|그것|저거|이거|이걸로|위에거|위에꺼)/.test(t) && !hasSlotLike(t)) e.same = true;
   if (!e.qty && /^(한|하나|두|둘|세|셋|넷|다섯)$/.test(t)) e.qty = KN[t];
-  if (/^(네|예|응|넵|넹|맞아|맞습니다|맞네|좋아|그래|그렇게|오케이|ok|yes)$|^(네|예|응|넵|넹)(요|에요|예요|맞아|맞아요)?$|맞아요?$|맞습니다|그걸로|그렇게해/.test(t)) e.yes = true;
-  if (/^(아니|아뇨|노|no)|틀려|틀렸|아니요|아니에요|다른거|다른메뉴|다른걸/.test(t)) { e.no = true; e.yes = false; }
+  if (/^(네|내|예|응|어|넵|넹|넴|야|그래|좋아|좋지|오케이|오케|옳지|맞아|맞다|맞지|콜|됐어|됐다|ok|yes|yeah)+(요|이요|예요|에요|습니다|용|염|네|죠|지)?$|^(네|예|응)[네예응\s]*$|맞아요?$|맞습니다|맞네요?$|그걸로|그렇게(해|하)|그거로|좋아요$|괜찮아요?$|해주세요$|담아/.test(t)) e.yes = true;
+  if (/^(아니|아뇨|아냐|노|no|nope)|틀려|틀렸|아니요|아니에요|아닌데|다른거|다른메뉴|다른걸|바꿀|바꿔|고칠|잘못/.test(t)) { e.no = true; e.yes = false; }
   if (/추천|뭐가맛|뭘먹|뭐먹|인기|맛있는|잘나가/.test(t)) e.recommend = true;
   if (/이벤트|할인|행사|쿠폰/.test(t)) e.event = true;
   if (/메뉴(보|알려|뭐|좀)|뭐있|뭐가있|종류|전체메뉴|메뉴판/.test(t)) e.menuList = true;
@@ -362,6 +372,7 @@ function extract(raw){
   if (/없어|없습니다|그만|끝|다됐|됐어/.test(t)) e.done = true;
   if (/결제|계산|낼게/.test(t)) e.pay = true;
   if (/빼|삭제|지워|취소|없애|제외/.test(t)) e.remove = true;
+  if (/주문(할게|할께|이요|이요|해줘|해주세요|합니다|요)?$|담아|바로|넣어줘|장바구니/.test(t) && !e.remove) e.order = true;
   if (/카드|신용|체크/.test(t)) e.payMethod = 'card';
   else if (/페이|휴대폰|핸드폰|폰|바코드|큐알|qr/.test(t)) e.payMethod = 'mobile';
   else if (/현금|지폐/.test(t)) e.payMethod = 'cash';
@@ -408,17 +419,41 @@ function entitySummary(e){
 }
 
 /* ---------- 음성 출력 ---------- */
-let koVoice = null;
-function pickVoice(){ try { koVoice = speechSynthesis.getVoices().find(v => /ko/i.test(v.lang)) || null; } catch(_){} }
+let koVoice = null, koVoices = [];
+// 자연스러운 순서: 프리미엄/향상된 음성 → Siri → Yuna → Google → 나머지
+const VOICE_RANK = v => (/premium|프리미엄/i.test(v.name) ? 0 : /enhanced|향상/i.test(v.name) ? 1 : /siri/i.test(v.name) ? 2 : /yuna|유나/i.test(v.name) ? 3 : /google/i.test(v.name) ? 4 : /sunhi|heami|injoon/i.test(v.name) ? 5 : 6);
+function pickVoice(){
+  try {
+    koVoices = speechSynthesis.getVoices().filter(v => /^ko/i.test(v.lang)).sort((a,b) => VOICE_RANK(a) - VOICE_RANK(b));
+    let saved = null; try { saved = localStorage.getItem('kiosk-voice'); } catch(_){}
+    koVoice = koVoices.find(v => v.name === saved) || koVoices[0] || null;
+    renderVoices();
+  } catch(_){}
+}
 if ('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function renderVoices(){
+  const sel = $('mVoice'); if (!sel) return;
+  sel.innerHTML = koVoices.length ? koVoices.map(v => `<option value="${esc(v.name)}" ${koVoice && v.name === koVoice.name ? 'selected' : ''}>${esc(v.name)}${/premium|enhanced|프리미엄|향상/i.test(v.name) ? ' ★' : ''}</option>`).join('') : '<option>한국어 음성 없음</option>';
+}
+let speakSeq = 0;
 function speak(text){
   if (!S.tts || !('speechSynthesis' in window)) { afterSpeak(); return; }
   try {
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/\n/g,' '));
-    u.lang = 'ko-KR'; if (koVoice) u.voice = koVoice; u.rate = S.slow ? 0.78 : 0.98;
-    u.onend = afterSpeak; u.onerror = afterSpeak;
-    speechSynthesis.speak(u);
+    const mySeq = ++speakSeq;
+    // 문장 단위로 나눠 읽으면 억양이 덜 평평해지고, 문장 사이에 자연스러운 숨이 생김
+    const parts = text.replace(/\n/g,' ').split(/(?<=[.?!])\s+/).filter(Boolean);
+    let i = 0;
+    const nextPart = () => {
+      if (mySeq !== speakSeq) return;
+      if (i >= parts.length) { afterSpeak(); return; }
+      const u = new SpeechSynthesisUtterance(parts[i++]);
+      u.lang = 'ko-KR'; if (koVoice) u.voice = koVoice;
+      u.rate = S.slow ? 0.8 : 1.0; u.pitch = 1.05;
+      u.onend = () => setTimeout(nextPart, 120); u.onerror = () => setTimeout(nextPart, 0);
+      speechSynthesis.speak(u);
+    };
+    nextPart();
   } catch(_) { afterSpeak(); }
 }
 const LISTEN_STATES = new Set(['ASK_MENU','ASK_EVENT','ASK_SET','ASK_SIDE','ASK_DRINK','ASK_SIZE','ASK_QTY','CONFIRM_ITEM','CHANGE','ASK_MORE','FINAL','REMOVE','ASK_PAY','CHECK']);
@@ -431,9 +466,11 @@ function listen(byUser){
   S.listenByUser = !!byUser;
   try { speechSynthesis.cancel(); } catch(_){}
   rec = new SR(); rec.lang = 'ko-KR'; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = false;
+  let gotFinal = false, lastInterim = '';
   rec.onresult = ev => {
     const r = ev.results[ev.results.length - 1];
-    if (!r.isFinal) { setInterim(r[0].transcript); return; }
+    if (!r.isFinal) { lastInterim = r[0].transcript; setInterim(lastInterim); return; }
+    gotFinal = true;
     const alts = Array.from(r).map(a => ({ t:a.transcript.trim(), c:a.confidence > 0 ? a.confidence : null }));
     handle(alts, 'voice');
   };
@@ -457,7 +494,11 @@ function listen(byUser){
     }
     render();
   };
-  rec.onend = () => { S.listening = false; setInterim(''); renderMic(); };
+  rec.onend = () => {
+    S.listening = false; setInterim(''); renderMic();
+    // Safari: 최종(isFinal) 결과 없이 끝나는 경우 → 마지막 중간 결과를 낮은 신뢰도로 사용
+    if (!gotFinal && lastInterim.trim()) { log('k', '[Safari] 최종 결과 없이 종료 → 중간 결과 사용'); handle([{t:lastInterim.trim(), c:0.55}], 'voice'); }
+  };
   try { S.peak = 0; rec.start(); S.listening = true; S.notice = ''; } catch(_) { S.listening = false; }
   renderMic();
 }
@@ -549,6 +590,23 @@ function confirmItem(p=''){
     O('아니요, 바꿀래요','아니요',{sub:'틀린 부분만 고쳐요'}),
   ]);
 }
+function setQty(delta){
+  const q = Math.min(20, Math.max(1, (S.draft.qty || 1) + delta));
+  if (q === S.draft.qty) return;
+  S.draft.qty = q;
+  log('u', `[수량 버튼] ${q}개`, '터치');
+  S.line = `${describe(S.draft)}. 금액은 ${won(priceOf(S.draft))}이에요. 맞으면 "네", 틀리면 "아니요"라고 말씀해 주세요.`;
+  render(); speak(`${q}개로 바꿨어요. ${won(priceOf(S.draft))}이에요.`);
+}
+function setCartQty(i, delta){
+  const d = S.cart[i]; if (!d) return;
+  const q = Math.min(20, Math.max(1, (d.qty || 1) + delta));
+  if (q === d.qty) return;
+  d.qty = q;
+  log('u', `[수량 버튼] ${byId(MENU,d.menu).name} ${q}개`, '터치');
+  if (S.state === 'FINAL') { S.line = `${byId(MENU,d.menu).name} ${q}개로 바꿨어요. 모두 ${won(total())}이에요. 결제하시겠어요?`; if (S.options[0]) S.options[0].sub = won(total()); }
+  render(); speak(`${q}개로 바꿨어요. 모두 ${won(total())}이에요.`);
+}
 function askChange(p=''){
   const opts = [O('메뉴','메뉴를 바꿀래요'), O('세트 / 버거만','세트 여부를 바꿀래요')];
   if (S.draft.set) opts.push(O('사이드','사이드를 바꿀래요'), O('음료','음료를 바꿀래요'), O('세트 크기','세트 크기를 바꿀래요'));
@@ -629,6 +687,26 @@ function merge(e){
   if ((e.side || e.drink) && S.draft.set === undefined) S.draft.set = true;
   if (S.draft.set === false) { delete S.draft.side; delete S.draft.drink; delete S.draft.size; }
 }
+const DEFAULTS = { side:'fries', drink:'cola', size:'M' };
+function quickAdd(p=''){
+  const d = S.draft;
+  if (d.set === undefined) d.set = false;
+  if (d.set) { d.side = d.side || DEFAULTS.side; d.drink = d.drink || DEFAULTS.drink; d.size = d.size || DEFAULTS.size; }
+  d.qty = d.qty || 1;
+  S.cart.push({...d}); S.draft = {};
+  const added = S.cart[S.cart.length - 1];
+  const detail = added.set ? ' 사이드와 음료는 기본 구성이에요. 바꾸려면 "방금 거 바꿔 줘"라고 말씀해 주세요.' : '';
+  ask('ASK_MORE', p + `${describe(added)}, ${won(priceOf(added))}. 바로 담았어요.${detail} 더 주문하실 게 있으세요?`, [
+    O('더 주문할게요','더 주문할게요'),
+    O('이제 결제할게요','결제할게요',{cls:'prime'}),
+    O('방금 담은 메뉴 바꾸기','방금 거 바꿀래요'),
+  ]);
+}
+function editLast(){
+  if (!S.cart.length) return askMenu();
+  S.draft = S.cart.pop();
+  askChange('방금 담은 메뉴를 다시 열었어요. ');
+}
 function next(p=''){
   const d = S.draft;
   if (!d.menu) return askMenu(p + ((d.side||d.drink) ? '먼저 버거를 골라 주세요. ' : ''));
@@ -668,7 +746,9 @@ function apply(e, st){
     if (e.event && /ASK_MENU|ASK_MORE|ASK_SET/.test(st)) return eventOffer();
     if (e.menuList && /ASK_MENU|ASK_MORE|ASK_EVENT|CHANGE|ASK_SET/.test(st)) return showMenuList();
   }
-  if (hasSlot(e) && /ASK_MORE|FINAL/.test(st) && e.menu && !e.remove) { S.draft = {}; merge(e); return next(); }
+  if (hasSlot(e) && /ASK_MORE|FINAL/.test(st) && e.menu && !e.remove) { S.draft = {}; merge(e); return e.order ? quickAdd() : next(); }
+  if (e.menu && e.order && !e.remove && /ASK_MENU|ASK_EVENT|ASK_SET|ASK_SIDE|ASK_DRINK|ASK_SIZE/.test(st)) { if (st === 'ASK_MENU' || st === 'ASK_EVENT') S.draft = {}; merge(e); return quickAdd(); }
+  if (/방금|마지막/.test(S.heard) && /바꿀|바꿔|고칠|고쳐|수정/.test(S.heard) && /ASK_MORE|FINAL/.test(st)) return editLast();
 
   switch (st){
     case 'ASK_EVENT':
@@ -678,7 +758,7 @@ function apply(e, st){
       break;
     case 'CONFIRM_ITEM':
       if (hasSlot(e)) { merge(e); return next('바꿨어요. '); }
-      if (e.yes) { S.cart.push({...S.draft}); S.draft = {}; return askMore(); }
+      if (e.yes || e.order) { S.cart.push({...S.draft}); S.draft = {}; return askMore(); }
       if (e.no) return askChange();
       break;
     case 'CHANGE':
@@ -696,7 +776,7 @@ function apply(e, st){
       if (e.qty || e.num) { S.draft.qty = Math.min(e.qty || e.num, 20); return next(); }
       break;
     case 'ASK_MORE':
-      if (e.menu) { S.draft = {}; merge(e); return next(); }
+      if (e.menu) { S.draft = {}; merge(e); return e.order ? quickAdd() : next(); }
       if (e.pay || e.done || e.no) return askFinal();
       if (e.more || e.yes) { S.draft = {}; return askMenu(); }
       break;
@@ -925,7 +1005,8 @@ function render(flash){
   if (S.state === 'DONE') {
     h += `<div class="payart"><div class="orderno num"><small>주문 번호</small>${S.orderNo}</div><div style="font-size:1.15em">진동벨을 가져가 주세요. 음식이 나오면 <b>진동벨이 울리고</b> 화면에도 번호가 떠요.</div></div>`;
   }
-  if (S.preview) h += `<div class="payart" style="padding:.6em"><div style="width:min(100%,18em);height:7.5em">${S.preview.replace('<svg','<svg style="width:100%;height:100%"')}</div></div>`;
+  if (S.preview) h += `<div class="payart" style="padding:.6em"><div style="width:min(100%,18em);height:7.5em">${S.preview.replace('<svg','<svg style="width:100%;height:100%"')}</div>
+    <div class="stepper" aria-label="수량"><button class="st" data-q="-1" aria-label="하나 빼기">−</button><span class="num" id="qtyv">${S.draft.qty||1}개</span><button class="st" data-q="1" aria-label="하나 더">+</button><span class="price num" id="qtyp">${won(priceOf(S.draft))}</span></div></div>`;
   const hasImg = S.options.some(o => o.img), n = S.options.length;
   const cols = hasImg ? (n >= 4 ? 2 : n) : 0;
   h += `<div class="opts" role="group" aria-label="고를 수 있는 답"${cols ? ` style="grid-template-columns:repeat(${cols},1fr)"` : ''}>${S.options.map((o,i) =>
@@ -934,6 +1015,8 @@ function render(flash){
   h += cartHTML();
   el.innerHTML = h;
   el.querySelectorAll('.opt').forEach(b => b.onclick = () => pickOption(+b.dataset.i));
+  el.querySelectorAll('.st').forEach(b => b.onclick = () => setQty(+b.dataset.q));
+  el.querySelectorAll('.cq').forEach(b => b.onclick = () => setCartQty(+b.dataset.i, +b.dataset.q));
   el.querySelectorAll('.rm').forEach(b => b.onclick = () => { log('u', `[빼기 버튼] ${describe(S.cart[+b.dataset.rm])}`, '터치'); removeItem(+b.dataset.rm); });
   bindMic();
   if (flash) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
@@ -983,7 +1066,7 @@ function renderMic(){
   const st = $('micSt'); if (st) st.textContent = !SR ? '이 브라우저는 음성 인식을 지원하지 않아요' : !S.srOK ? '마이크를 쓸 수 없어요' : S.listening ? '듣고 있어요. 말씀해 주세요' : '마이크를 누르고 말씀해 주세요';
 }
 function cartHTML(){
-  const items = S.cart.map((d,i) => `<li><span>${esc(byId(MENU,d.menu).name)}${d.set?(d.size==='L'?' 라지 세트':' 세트'):''} × ${d.qty}${d.set?`<small>${byId(SIDES,d.side).name} · ${byId(DRINKS,d.drink).name}</small>`:''}</span><span class="num">${won(priceOf(d))}${/FINAL|REMOVE/.test(S.state)?` <button class="rm" data-rm="${i}" aria-label="${esc(describe(d))} 빼기">빼기</button>`:''}</span></li>`).join('');
+  const items = S.cart.map((d,i) => `<li><span>${esc(byId(MENU,d.menu).name)}${d.set?(d.size==='L'?' 라지 세트':' 세트'):''} × ${d.qty}${d.set?`<small>${byId(SIDES,d.side).name} · ${byId(DRINKS,d.drink).name}</small>`:''}</span><span class="num">${won(priceOf(d))}${/FINAL|REMOVE/.test(S.state)?` <button class="cq" data-i="${i}" data-q="-1" aria-label="하나 빼기">−</button><button class="cq" data-i="${i}" data-q="1" aria-label="하나 더">+</button><button class="rm" data-rm="${i}" aria-label="${esc(describe(d))} 빼기">빼기</button>`:''}</span></li>`).join('');
   return `<div class="cart"><h3><span>장바구니</span><span>${S.cart.length}개 메뉴</span></h3>
     ${S.cart.length ? `<ul>${items}</ul><div class="tot"><span>합계</span><span class="num">${won(total())}</span></div>` : '<div class="empty">아직 담은 메뉴가 없어요</div>'}</div>`;
 }
@@ -1030,7 +1113,9 @@ $('tHc').onclick = () => { kiosk.dataset.hc = kiosk.dataset.hc === '1' ? '0' : '
 $('tTts').onclick = () => { S.tts = !S.tts; if (!S.tts) try { speechSynthesis.cancel(); } catch(_){} syncToggles(); };
 $('tSlow').onclick = () => { S.slow = !S.slow; syncToggles(); };
 $('home').onclick = () => reset(false);
+$('monbtn').onclick = () => { const m = document.querySelector('.mon'); m.classList.toggle('show'); $('monbtn').textContent = m.classList.contains('show') ? '운영 모니터 닫기' : '운영 모니터 보기'; };
 $('wSmall').onclick = () => loadWebLLM('small');
+$('mVoice').onchange = ev => { koVoice = koVoices.find(v => v.name === ev.target.value) || koVoice; try { localStorage.setItem('kiosk-voice', ev.target.value); } catch(_){} unlockTTS(); speak('안녕하세요, 웩도날드예요. 이 목소리로 안내할게요.'); };
 $('wMid').onclick = () => loadWebLLM('mid');
 $('staff').onclick = () => callStaff();
 $('resume').onclick = resume;
