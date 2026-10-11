@@ -311,7 +311,7 @@ const ART = {
       <path d="M58 24L66 4" stroke="#D7282F" stroke-width="5" stroke-linecap="round"/>
       <path d="M36 50v26" stroke="rgba(255,255,255,.35)" stroke-width="6" stroke-linecap="round"/>`; },
   drink(id){ const c = {cola:['#3B1F14','#24120B'], zcola:['#2A2A2E','#111114'], cider:['#78C9A8','#4EA886'], oj:['#F6A030','#E07E15'], icetea:['#C97A2B','#9A5A1A'], coffee:['#8B5A2B','#5C3A18'], milk:['#F6F4EE','#DAD6CC']}[id] || ['#888','#666'];
-    const label = id === 'zcola' ? '<text x="50" y="66" text-anchor="middle" font-size="18" font-weight="700" fill="#E9E4D8" font-family="sans-serif">ZERO</text>' : '';
+    const label = id === 'zcola' ? '<text x="50" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="#E9E4D8" font-family="sans-serif">ZERO</text>' : '';
     return svgWrap(ART.drinkInner(c[0], c[1]) + label); },
   set(kind, side='fries', drink='cola'){
     const sideArt = side==='fries' ? ART.friesInner() : (ART[side] ? ART[side]() : ART.friesInner()).replace(/<\/?svg[^>]*>/g,'');
@@ -329,21 +329,21 @@ const MENU = [ // 정규식은 배열 순서대로 검사: 더 구체적인 이�
   {id:'bacon',   name:'베이컨토마토버거', price:6200, re:/베이컨|토마토|비티/, desc:'베이컨과 생토마토'},
 ];
 const SIDES = [
-  {id:'fries',  name:'감자튀김', add:0,    re:/감자|프라이|후렌치|감튀|튀김|포테이토/},
-  {id:'nugget', name:'치킨너겟', add:1000, re:/너겟|너깃|너겍|넛겟|맥너겟/},
-  {id:'stick',  name:'치즈스틱', add:500,  re:/치즈스틱|스틱/},
-  {id:'hash',   name:'해시브라운', add:500, re:/해시|해쉬|브라운/},
-  {id:'corn',   name:'콘샐러드', add:0,    re:/콘샐러드|콘|옥수수/},
-  {id:'slaw',   name:'코울슬로', add:0,    re:/코울슬로|콜슬로|코슬로|슬로|샐러드|양배추|야채/},
+  {id:'fries',  name:'감자튀김', add:0, price:2000, re:/감자|프라이|후렌치|감튀|튀김|포테이토/},
+  {id:'nugget', name:'치킨너겟', add:1000, price:3200, re:/너겟|너깃|너겍|넛겟|맥너겟/},
+  {id:'stick',  name:'치즈스틱', add:500, price:2500, re:/치즈스틱|스틱/},
+  {id:'hash',   name:'해시브라운', add:500, price:1800, re:/해시|해쉬|브라운/},
+  {id:'corn',   name:'콘샐러드', add:0, price:1800, re:/콘샐러드|콘|옥수수/},
+  {id:'slaw',   name:'코울슬로', add:0, price:1800, re:/코울슬로|콜슬로|코슬로|슬로|샐러드|양배추|야채/},
 ];
 const DRINKS = [
-  {id:'zcola',  name:'제로콜라', add:0,   re:/제로|다이어트|무설탕/},
-  {id:'cola',   name:'콜라', add:0,       re:/콜라|코카|코크|펩시/},
-  {id:'cider',  name:'사이다', add:0,     re:/사이다|스프라이트|칠성/},
-  {id:'oj',     name:'오렌지주스', add:500, re:/오렌지|주스|쥬스/},
-  {id:'icetea', name:'아이스티', add:300, re:/아이스티|홍차|레몬티|복숭아/},
-  {id:'coffee', name:'커피', add:0,       re:/커피|아메리카노|라떼/},
-  {id:'milk',   name:'우유', add:0,       re:/우유|밀크/},
+  {id:'zcola',  name:'제로콜라', add:0, price:1800, re:/제로|다이어트|무설탕/},
+  {id:'cola',   name:'콜라', add:0, price:1800, re:/콜라|코카|코크|펩시/},
+  {id:'cider',  name:'사이다', add:0, price:1800, re:/사이다|스프라이트|칠성/},
+  {id:'oj',     name:'오렌지주스', add:500, price:2300, re:/오렌지|주스|쥬스/},
+  {id:'icetea', name:'아이스티', add:300, price:2200, re:/아이스티|홍차|레몬티|복숭아/},
+  {id:'coffee', name:'커피', add:0, price:2000, re:/커피|아메리카노|라떼/},
+  {id:'milk',   name:'우유', add:0, price:1800, re:/우유|밀크/},
 ];
 const SET_ADD = 2000, EVENT_OFF = 1000, SIZE_ADD = 700;
 const byId = (arr, id) => arr.find(x => x.id === id);
@@ -377,7 +377,8 @@ function extract(raw){
   if (/^(아니|아뇨|아냐|노|no|nope)|틀려|틀렸|아니요|아니에요|아닌데|다른거|다른메뉴|다른걸|바꿀|바꿔|고칠|잘못/.test(t)) { e.no = true; e.yes = false; }
   if (/추천|뭐가맛|뭘먹|뭐먹|인기|맛있는|잘나가/.test(t)) e.recommend = true;
   if (/이벤트|할인|행사|쿠폰/.test(t)) e.event = true;
-  if (/메뉴(보|알려|뭐|좀)|뭐있|뭐가있|종류|전체메뉴|메뉴판/.test(t)) e.menuList = true;
+  if (/사이드(음료)?(만|보|알려|메뉴)|음료(만|보|알려|메뉴)|사이드.?음료/.test(t) && !e.side && !e.drink) e.sideList = true;
+  else if (/메뉴(보|알려|뭐|좀)|뭐있|뭐가있|종류|전체메뉴|메뉴판/.test(t)) e.menuList = true;
   if (/직원|사람불러|도와주세요|도움|못하겠|어려워/.test(t)) e.staff = true;
   if (/처음으로|처음부터|다시시작|새주문|새로주문/.test(t)) e.restart = true;
   if (/더주문|추가|하나더|더할/.test(t)) e.more = true;
@@ -405,7 +406,19 @@ const relevant = e => hasSlot(e) || Object.keys(e).some(k => e[k] !== undefined 
 const S = { mode:null, state:'START', draft:{}, cart:[], fails:0, check:null, options:[],
   line:'', heard:'', tts:true, slow:false, srOK:!!SR, listening:false, notice:'', orderNo:null, payMethod:null, lastAlts:null, log:[] };
 
+function itemName(d){
+  if (d.kind === 'side') return byId(SIDES, d.side).name;
+  if (d.kind === 'drink') return byId(DRINKS, d.drink).name;
+  return byId(MENU, d.menu).name + (d.set ? (d.size === 'L' ? ' 라지 세트' : ' 세트') : '');
+}
+function itemArt(d){
+  if (d.kind === 'side') return ART[d.side] ? ART[d.side]() : ART.fries();
+  if (d.kind === 'drink') return ART.drink(d.drink);
+  return d.set ? ART.set(d.menu, d.side, d.drink) : ART.burger(d.menu);
+}
 function priceOf(d){
+  if (d.kind === 'side') return (byId(SIDES, d.side)?.price || 0) * (d.qty || 1);
+  if (d.kind === 'drink') return (byId(DRINKS, d.drink)?.price || 0) * (d.qty || 1);
   const m = byId(MENU, d.menu); if (!m) return 0;
   let p = m.price;
   if (d.set){ p += SET_ADD + (d.size === 'L' ? SIZE_ADD : 0); p += (byId(SIDES,d.side)?.add||0) + (byId(DRINKS,d.drink)?.add||0); if (d.menu==='shrimp') p -= EVENT_OFF; }
@@ -413,6 +426,7 @@ function priceOf(d){
 }
 const total = () => S.cart.reduce((a,d) => a + priceOf(d), 0);
 function describe(d){
+  if (d.kind === 'side' || d.kind === 'drink') return `${itemName(d)} ${d.qty||1}개`;
   const m = byId(MENU,d.menu);
   let s = `${m.name}${d.set?(d.size==='L'?' 라지 세트':' 세트'):''} ${d.qty||1}개`;
   if (d.set) s += `, 사이드는 ${byId(SIDES,d.side).name}, 음료는 ${byId(DRINKS,d.drink).name}`;
@@ -468,7 +482,7 @@ function speak(text){
     nextPart();
   } catch(_) { afterSpeak(); }
 }
-const LISTEN_STATES = new Set(['ASK_MENU','ASK_EVENT','ASK_SET','ASK_SIDE','ASK_DRINK','ASK_SIZE','ASK_QTY','CONFIRM_ITEM','CHANGE','ASK_MORE','FINAL','REMOVE','ASK_PAY','CHECK']);
+const LISTEN_STATES = new Set(['ASK_MENU','ASK_ALONE','ASK_EVENT','ASK_SET','ASK_SIDE','ASK_DRINK','ASK_SIZE','ASK_QTY','CONFIRM_ITEM','CHANGE','ASK_MORE','FINAL','REMOVE','ASK_PAY','CHECK']);
 function afterSpeak(){ if (S.mode === 'voice' && S.srOK && LISTEN_STATES.has(S.state) && $('overlay').hidden) listen(); }
 
 /* ---------- 음성 인식 ---------- */
@@ -552,6 +566,7 @@ function askMenu(p=''){
     O('추천해 주세요','추천해줘',{cls:'prime', sub:'많이 찾는 메뉴를 알려 드려요'}),
     O('오늘의 이벤트','이벤트',{sub:'새우버거 세트 1,000원 할인'}),
     O('전체 메뉴 보기','메뉴 보여줘',{sub:`버거 ${MENU.length}가지`}),
+    O('사이드·음료만','사이드 음료 보여줘',{sub:'버거 없이 따로 주문'}),
   ]);
 }
 function showMenuList(p=''){
@@ -615,8 +630,8 @@ function setCartQty(i, delta){
   const q = Math.min(20, Math.max(1, (d.qty || 1) + delta));
   if (q === d.qty) return;
   d.qty = q;
-  log('u', `[수량 버튼] ${byId(MENU,d.menu).name} ${q}개`, '터치');
-  if (S.state === 'FINAL') { S.line = `${byId(MENU,d.menu).name} ${q}개로 바꿨어요. 모두 ${won(total())}이에요. 결제하시겠어요?`; if (S.options[0]) S.options[0].sub = won(total()); }
+  log('u', `[수량 버튼] ${itemName(d)} ${q}개`, '터치');
+  if (S.state === 'FINAL') { S.line = `${itemName(d)} ${q}개로 바꿨어요. 모두 ${won(total())}이에요. 결제하시겠어요?`; if (S.options[0]) S.options[0].sub = won(total()); }
   render(); speak(`${q}개로 바꿨어요. 모두 ${won(total())}이에요.`);
 }
 function askChange(p=''){
@@ -642,7 +657,7 @@ function askFinal(p=''){
 function askRemove(p=''){
   if (!S.cart.length) return askMenu('장바구니가 비었어요. ');
   ask('REMOVE', p + `어떤 메뉴를 뺄까요? ${S.cart.map((d,i)=>`${i+1}번 ${describe(d)}`).join('. ')}. 번호나 이름을 말씀해 주세요.`, [
-    ...S.cart.map((d,i) => O(`${byId(MENU,d.menu).name}${d.set?(d.size==='L'?' 라지 세트':' 세트'):''} × ${d.qty}`, `__rm${i}`, {cls:'alert', sub:`${d.set?`${byId(SIDES,d.side).name} · ${byId(DRINKS,d.drink).name} · `:''}${won(priceOf(d))}`, img:d.set ? ART.set(d.menu,d.side,d.drink) : ART.burger(d.menu)})),
+    ...S.cart.map((d,i) => O(`${itemName(d)} × ${d.qty}`, `__rm${i}`, {cls:'alert', sub:`${d.set?`${byId(SIDES,d.side).name} · ${byId(DRINKS,d.drink).name} · `:''}${won(priceOf(d))}`, img:itemArt(d)})),
     O('안 뺄래요','취소할게요'),
   ]);
 }
@@ -655,7 +670,7 @@ function removeItem(i, p=''){
 // "새우버거 빼 줘", "콜라 들어간 거 빼 줘" → 장바구니에서 맞는 항목 찾기
 function findCartItems(e){
   return S.cart.map((d,i)=>({d,i})).filter(({d}) =>
-    (!e.menu || d.menu === e.menu) && (!e.side || d.side === e.side) && (!e.drink || d.drink === e.drink) &&
+    (!e.menu || d.menu === e.menu) && (!e.menu || !d.kind) && (!e.side || d.side === e.side) && (!e.drink || d.drink === e.drink) &&
     (e.set === undefined || !!d.set === e.set) && (!e.size || d.size === e.size)).map(x => x.i);
 }
 function handleRemove(e){
@@ -691,7 +706,7 @@ function finishPay(){
     [O('새 주문 시작하기','처음으로',{cls:'prime'})]);
 }
 const ASKERS = {ASK_MENU:askMenu, ASK_EVENT:eventOffer, ASK_SET:askSet, ASK_SIDE:askSide, ASK_DRINK:askDrink, ASK_SIZE:askSize, ASK_QTY:askQty,
-  CONFIRM_ITEM:confirmItem, CHANGE:askChange, ASK_MORE:askMore, FINAL:askFinal, REMOVE:askRemove, ASK_PAY:askPay};
+  CONFIRM_ITEM:confirmItem, CHANGE:askChange, ASK_MORE:askMore, FINAL:askFinal, REMOVE:askRemove, ASK_PAY:askPay, ASK_ALONE:(p)=>S.pendingAlone?askAlone(S.pendingAlone,p):askMenu(p)};
 const reprompt = (st, p) => (ASKERS[st] || askMenu)(p);
 
 function merge(e){
@@ -716,12 +731,38 @@ function quickAdd(p=''){
 }
 function editLast(){
   if (!S.cart.length) return askMenu();
+  if (S.cart[S.cart.length-1].kind) return askRemove('사이드나 음료는 빼고 다시 담아 주세요. ');
   S.draft = S.cart.pop();
   askChange('방금 담은 메뉴를 다시 열었어요. ');
 }
+function addStandalone(e, p=''){
+  const added = [];
+  if (e.side) added.push({kind:'side', side:e.side, qty:e.qty || 1});
+  if (e.drink) added.push({kind:'drink', drink:e.drink, qty:e.qty || 1});
+  S.cart.push(...added); S.pendingAlone = null; S.draft = {};
+  const txt = added.map(d => `${describe(d)}, ${won(priceOf(d))}`).join('. ');
+  ask('ASK_MORE', p + `${txt}. 담았어요. 더 주문하실 게 있으세요?`, [
+    O('더 주문할게요','더 주문할게요'),
+    O('이제 결제할게요','결제할게요',{cls:'prime'}),
+  ]);
+}
+function askAlone(e, p=''){
+  S.pendingAlone = e;
+  const names = [e.side && byId(SIDES,e.side).name, e.drink && byId(DRINKS,e.drink).name].filter(Boolean).join('과 ');
+  const price = (e.side ? byId(SIDES,e.side).price : 0) + (e.drink ? byId(DRINKS,e.drink).price : 0);
+  ask('ASK_ALONE', p + `${names}만 따로 드릴까요, 버거 세트에 넣어 드릴까요?`, [
+    O(`${names}만 담기`, '단품으로 담아줘', {cls:'prime', sub:`${won(price * (e.qty||1))}${e.qty>1?` · ${e.qty}개`:''}`, img: e.side ? (ART[e.side]?ART[e.side]():ART.fries()) : ART.drink(e.drink)}),
+    O('버거 세트에 넣기', '세트로 할게요', {sub:'버거를 이어서 골라요', img: ART.set('bulgogi', e.side || 'fries', e.drink || 'cola')}),
+  ]);
+}
+function showSideDrinkList(p=''){
+  ask('ASK_MENU', p + '사이드와 음료는 따로도 주문할 수 있어요. 이름이나 번호를 말씀해 주세요.',
+    [...SIDES.map(x => O(x.name, `${x.name} 단품 추가`, {sub:won(x.price), img:ART[x.id]()})),
+     ...DRINKS.map(x => O(x.name, `${x.name} 단품 추가`, {sub:won(x.price), img:ART.drink(x.id)}))]);
+}
 function next(p=''){
   const d = S.draft;
-  if (!d.menu) return askMenu(p + ((d.side||d.drink) ? '먼저 버거를 골라 주세요. ' : ''));
+  if (!d.menu) return askMenu(p + ((d.side||d.drink) ? '버거를 골라 주세요. 고른 사이드와 음료는 세트에 넣어 드릴게요. ' : ''));
   if (d.set === undefined) return askSet(p);
   if (d.set && !d.side) return askSide(p);
   if (d.set && !d.drink) return askDrink(p);
@@ -752,6 +793,20 @@ function notUnderstood(st){
 function apply(e, st){
   if (st === 'DONE') { if (e.restart || e.yes) return reset(); return; }
   if (st === 'PAYING') { return; }
+  // 사이드·음료만 말하면("치즈스틱 하나 추가해줘") 버거 없이 따로 담기
+  if (!e.menu && (e.side || e.drink) && !e.remove && !S.draft.menu && /ASK_MENU|ASK_EVENT|ASK_MORE|FINAL|ASK_ALONE/.test(st)) {
+    if (st === 'ASK_ALONE' && S.pendingAlone) e = {...S.pendingAlone, ...e};
+    if (e.set === true) { S.draft = {}; merge(e); return next(); }
+    if (e.order || e.more || e.qty || e.set === false || st === 'ASK_ALONE') return addStandalone(e);
+    return askAlone(e);
+  }
+  if (st === 'ASK_ALONE') {
+    const pe = S.pendingAlone || {};
+    if (e.set === true || e.menu) { S.draft = {}; merge({...pe, ...e, set:true}); return next(); }
+    if (e.set === false || e.order || e.yes || e.more) return addStandalone(pe);
+    if (e.no) { S.pendingAlone = null; return askMenu('알겠어요. '); }
+  }
+  if (!hasSlot(e) && e.sideList && /ASK_MENU|ASK_MORE|ASK_EVENT|FINAL/.test(st)) return showSideDrinkList();
   // 메뉴 이름이 함께 들리면("치킨버거 추천해줘") 메뉴 선택이 우선
   if (!hasSlot(e)) {
     if (e.recommend && /ASK_MENU|ASK_MORE|ASK_EVENT|ASK_SET/.test(st)) return recommend();
@@ -769,7 +824,8 @@ function apply(e, st){
       if (e.no) return showMenuList('알겠어요. ');
       break;
     case 'CONFIRM_ITEM':
-      if (hasSlot(e)) { merge(e); return next('바꿨어요. '); }
+      if (hasSlot(e) && !e.remove) { merge(e); return next('바꿨어요. '); }
+      if (e.pay) { S.cart.push({...S.draft}); S.draft = {}; return askFinal('담았어요. '); }
       if (e.yes || e.order) { S.cart.push({...S.draft}); S.draft = {}; return askMore(); }
       if (e.no) return askChange();
       break;
@@ -906,7 +962,7 @@ const LLM_SCHEMA = { type:'object', properties:{
   menu:{type:'string', enum:[...MENU.map(m=>m.id),'']}, set:{type:'string', enum:['set','single','']},
   side:{type:'string', enum:[...SIDES.map(x=>x.id),'']}, drink:{type:'string', enum:[...DRINKS.map(x=>x.id),'']},
   size:{type:'string', enum:['M','L','']}, qty:{type:'integer'}, pick:{type:'integer'}, answer:{type:'string', enum:['yes','no','']},
-  intent:{type:'string', enum:['recommend','event','menuList','staff','restart','more','done','pay','remove','all','']},
+  intent:{type:'string', enum:['recommend','event','menuList','sideList','staff','restart','more','done','pay','remove','all','order','']},
   payMethod:{type:'string', enum:['card','mobile','cash','']} }, required:['menu','set','side','drink','size','qty','pick','answer','intent','payMethod'] };
 const LLM_SYSTEM = `너는 패스트푸드 키오스크의 주문 이해기다. 손님의 한국어 발화를 JSON으로 구조화한다.
 메뉴: ${MENU.map(m=>`${m.name}(${m.id})`).join(' ')}. 사이드: ${SIDES.map(x=>`${x.name}(${x.id})`).join(' ')}. 음료: ${DRINKS.map(x=>`${x.name}(${x.id})`).join(' ')}.
@@ -1052,7 +1108,7 @@ function render(flash){
   if (S.preview) h += `<div class="payart" style="padding:.6em"><div style="width:min(100%,18em);height:7.5em">${S.preview.replace('<svg','<svg style="width:100%;height:100%"')}</div>
     <div class="stepper" aria-label="수량"><button class="st" data-q="-1" aria-label="하나 빼기">−</button><span class="num" id="qtyv">${S.draft.qty||1}개</span><button class="st" data-q="1" aria-label="하나 더">+</button><span class="price num" id="qtyp">${won(priceOf(S.draft))}</span></div></div>`;
   const hasImg = S.options.some(o => o.img), n = S.options.length;
-  const cols = hasImg ? (n >= 4 ? 2 : n) : 0;
+  const cols = hasImg ? (n >= 7 ? 3 : n >= 4 ? 2 : n) : 0;
   h += `<div class="opts" role="group" aria-label="고를 수 있는 답"${cols ? ` style="grid-template-columns:repeat(${cols},1fr)"` : ''}>${S.options.map((o,i) =>
     `<button class="opt ${o.cls||''} ${o.img?'card':''}" data-i="${i}">${o.img ? `<span class="pic">${o.img}</span>` : ''}<span class="l">${esc(o.label)}<kbd>${i+1}</kbd></span>${o.sub ? `<span class="s">${esc(o.sub)}</span>` : ''}</button>`).join('')}</div>`;
   if (LISTEN_STATES.has(S.state)) h += micHTML();
@@ -1110,7 +1166,7 @@ function renderMic(){
   const st = $('micSt'); if (st) st.textContent = !SR ? '이 브라우저는 음성 인식을 지원하지 않아요' : !S.srOK ? '마이크를 쓸 수 없어요' : S.listening ? '듣고 있어요. 말씀해 주세요' : '마이크를 누르고 말씀해 주세요';
 }
 function cartHTML(){
-  const items = S.cart.map((d,i) => `<li><span>${esc(byId(MENU,d.menu).name)}${d.set?(d.size==='L'?' 라지 세트':' 세트'):''} × ${d.qty}${d.set?`<small>${byId(SIDES,d.side).name} · ${byId(DRINKS,d.drink).name}</small>`:''}</span><span class="num">${won(priceOf(d))}${/FINAL|REMOVE/.test(S.state)?` <button class="cq" data-i="${i}" data-q="-1" aria-label="하나 빼기">−</button><button class="cq" data-i="${i}" data-q="1" aria-label="하나 더">+</button><button class="rm" data-rm="${i}" aria-label="${esc(describe(d))} 빼기">빼기</button>`:''}</span></li>`).join('');
+  const items = S.cart.map((d,i) => `<li><span>${esc(itemName(d))} × ${d.qty}${d.set?`<small>${byId(SIDES,d.side).name} · ${byId(DRINKS,d.drink).name}</small>`:''}</span><span class="num">${won(priceOf(d))}${/FINAL|REMOVE/.test(S.state)?` <button class="cq" data-i="${i}" data-q="-1" aria-label="하나 빼기">−</button><button class="cq" data-i="${i}" data-q="1" aria-label="하나 더">+</button><button class="rm" data-rm="${i}" aria-label="${esc(describe(d))} 빼기">빼기</button>`:''}</span></li>`).join('');
   return `<div class="cart"><h3><span>장바구니</span><span>${S.cart.length}개 메뉴</span></h3>
     ${S.cart.length ? `<ul>${items}</ul><div class="tot"><span>합계</span><span class="num">${won(total())}</span></div>` : '<div class="empty">아직 담은 메뉴가 없어요</div>'}</div>`;
 }
