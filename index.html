@@ -45,6 +45,11 @@ button,input{font:inherit;color:inherit}
 .tog[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .kiosk[data-hc="1"] .tog[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .screen{flex:1;display:flex;flex-direction:column;padding:1.2em;gap:1.1em;min-width:0}
+.llmbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5em .8em;padding:.6em 1em;background:var(--surface-2);border-bottom:var(--bw) solid var(--line);font-size:.85em}
+.llmbar .t{flex:1 1 16em;min-width:0}
+.llmbar .b{display:flex;gap:.4em}
+.llmbar .prog{height:.4em;flex-basis:100%;border-radius:99px;background:var(--line);overflow:hidden}
+.llmbar .prog i{display:block;height:100%;width:0;background:var(--go);transition:width .3s}
 .k-bottom{display:flex;gap:.7em;padding:.8em 1em;border-top:var(--bw) solid var(--line);background:var(--surface-2)}
 .k-bottom button{flex:1;min-height:3.4em;border-radius:14px;font-size:1.05em;font-weight:700;cursor:pointer;border:var(--bw) solid var(--line);background:var(--surface)}
 .k-bottom .staff{background:var(--alert);color:var(--alert-ink);border-color:var(--alert)}
@@ -181,6 +186,10 @@ button,input{font:inherit;color:inherit}
       <button class="tog" id="tHc" aria-pressed="false">◐ 고대비</button>
       <button class="tog" id="tTts" aria-pressed="true">🔈 음성 안내</button>
       <button class="tog" id="tSlow" aria-pressed="false">천천히 말하기</button>
+    </div>
+    <div class="llmbar" id="llmbar" hidden>
+      <span class="t" id="llmbarT">말을 더 잘 알아듣는 AI를 이 기기에 설치할까요? 한 번만 받으면 돼요 (약 400MB, 와이파이 권장).</span>
+      <span class="b"><button class="tog" id="llmYes" aria-pressed="true">설치하기</button><button class="tog" id="llmLater">나중에</button></span>
     </div>
     <div class="screenwrap">
       <div class="screen" id="screen" aria-live="polite"></div>
@@ -841,8 +850,40 @@ async function initLLM(){
     } else LLM.state = 'none';
   } catch(_) { LLM.state = 'none'; }
   renderMon();
-  let saved = null; try { saved = localStorage.getItem('kiosk-webllm'); } catch(_){}
-  if (saved && LLM.webgpu) loadWebLLM(saved);
+  let saved = null, later = null; try { saved = localStorage.getItem('kiosk-webllm'); later = sessionStorage.getItem('kiosk-llm-later'); } catch(_){}
+  if (saved && LLM.webgpu) return loadWebLLM(saved);
+  // 자동 설치 유도: 아직 LLM이 없고(또는 Chrome 내장 AI가 다운로드 가능 상태), 이번 세션에 거절하지 않았으면 안내 띄우기
+  if (!later && (LLM.state === 'download' || (LLM.state === 'none' && LLM.webgpu))) offerLLM();
+}
+function offerLLM(){
+  const bar = $('llmbar'); if (!bar) return;
+  $('llmbarT').textContent = LLM.state === 'download'
+    ? '말을 더 잘 알아듣는 AI를 이 브라우저에 준비할까요? Chrome 내장 AI 모델을 한 번만 내려받아요.'
+    : '말을 더 잘 알아듣는 AI를 이 기기에 설치할까요? 한 번만 받으면 돼요 (약 400MB, 와이파이 권장).';
+  bar.hidden = false;
+}
+async function installLLM(){
+  const bar = $('llmbar');
+  bar.querySelector('.b').hidden = true;
+  let prog = bar.querySelector('.prog'); if (!prog) { prog = document.createElement('span'); prog.className = 'prog'; prog.innerHTML = '<i></i>'; bar.appendChild(prog); }
+  const setT = t => { $('llmbarT').textContent = t; };
+  if (LLM.state === 'download') {
+    try {
+      setT('Chrome 내장 AI 모델을 내려받는 중이에요…');
+      LLM.session = await LanguageModel.create({ initialPrompts:[{role:'system', content:LLM_SYSTEM}],
+        monitor(m){ m.addEventListener('downloadprogress', e => { const pct = Math.round((e.loaded / (e.total || 1)) * 100); prog.firstChild.style.width = pct + '%'; setT(`Chrome 내장 AI 내려받는 중 ${pct}%`); }); } });
+      LLM.engine = 'chrome'; LLM.state = 'ready'; renderMon();
+      setT('준비됐어요. 이제 자유롭게 말씀하셔도 잘 알아들어요.'); setTimeout(() => { bar.hidden = true; }, 2500);
+      return;
+    } catch(err) { LLM.state = LLM.webgpu ? 'none' : LLM.state; log('k', '[LLM 설치 실패] ' + (err && err.message || err)); if (!LLM.webgpu) { setT('내려받지 못했어요. 지금은 버튼과 기본 해석으로 동작해요.'); setTimeout(() => { bar.hidden = true; }, 3000); return; } }
+  }
+  LLM.state = 'loading'; LLM.progress = '0% 시작';
+  const tick = setInterval(() => {
+    const m = (LLM.progress || '').match(/(\d+)%/); if (m) prog.firstChild.style.width = m[1] + '%';
+    setT(LLM.state === 'loading' ? `AI 설치 중… ${LLM.progress}` : LLM.state === 'ready' ? '준비됐어요. 이제 자유롭게 말씀하셔도 잘 알아들어요.' : `설치하지 못했어요. ${LLM.progress || ''} 지금은 버튼과 기본 해석으로 동작해요.`);
+    if (LLM.state === 'ready' || (LLM.state !== 'loading')) { clearInterval(tick); setTimeout(() => { bar.hidden = true; }, 3000); }
+  }, 400);
+  await loadWebLLM('small');
 }
 async function loadWebLLM(which){
   if (!LLM.webgpu) { LLM.progress = '이 브라우저는 WebGPU를 지원하지 않아요'; renderMon(); return; }
@@ -852,7 +893,7 @@ async function loadWebLLM(which){
     const modelId = await pickWebLLMModel(which);
     LLM.progress = modelId; renderMon();
     const engine = await mod.CreateMLCEngine(modelId, {
-      initProgressCallback: r => { LLM.progress = r.text.replace(/\[.*?\]/g,'').slice(0, 60); renderMon(); } });
+      initProgressCallback: r => { const pct = Math.round((r.progress || 0) * 100); LLM.progress = `${pct}% ${r.text.replace(/\[.*?\]/g,'').slice(0, 50)}`; renderMon(); } });
     LLM.mlc = engine; LLM.engine = 'webllm'; LLM.state = 'ready'; LLM.progress = modelId;
     try { localStorage.setItem('kiosk-webllm', which); } catch(_){}
   } catch(err) { LLM.state = 'none'; LLM.progress = '불러오기 실패: ' + (err && err.message || err).toString().slice(0, 80); }
@@ -1115,6 +1156,8 @@ $('tSlow').onclick = () => { S.slow = !S.slow; syncToggles(); };
 $('home').onclick = () => reset(false);
 $('monbtn').onclick = () => { const m = document.querySelector('.mon'); m.classList.toggle('show'); $('monbtn').textContent = m.classList.contains('show') ? '운영 모니터 닫기' : '운영 모니터 보기'; };
 $('wSmall').onclick = () => loadWebLLM('small');
+$('llmYes').onclick = installLLM;
+$('llmLater').onclick = () => { $('llmbar').hidden = true; try { sessionStorage.setItem('kiosk-llm-later', '1'); } catch(_){} };
 $('mVoice').onchange = ev => { koVoice = koVoices.find(v => v.name === ev.target.value) || koVoice; try { localStorage.setItem('kiosk-voice', ev.target.value); } catch(_){} unlockTTS(); speak('안녕하세요, 웩도날드예요. 이 목소리로 안내할게요.'); };
 $('wMid').onclick = () => loadWebLLM('mid');
 $('staff').onclick = () => callStaff();
