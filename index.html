@@ -196,6 +196,7 @@ button,input{font:inherit;color:inherit}
       <h4>대화 단계</h4>
       <span class="state" id="mState">START</span>
       <span id="mFails" style="margin-left:8px;color:var(--muted)"></span>
+      <div class="kv" style="margin-top:6px"><span>브라우저</span><span id="mBrowser" style="text-align:right">—</span></div>
       <div class="kv" style="margin-top:6px"><span>해석 엔진</span><span id="mLLM" style="text-align:right">확인 중</span></div>
       <div id="mWeb" hidden style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
         <button class="tog" id="wSmall" style="font-size:11px">브라우저 LLM 켜기 · 소형 (약 400MB)</button>
@@ -425,8 +426,9 @@ function afterSpeak(){ if (S.mode === 'voice' && S.srOK && LISTEN_STATES.has(S.s
 
 /* ---------- 음성 인식 ---------- */
 let rec = null;
-function listen(){
+function listen(byUser){
   if (!SR || !S.srOK || S.listening) return;
+  S.listenByUser = !!byUser;
   try { speechSynthesis.cancel(); } catch(_){}
   rec = new SR(); rec.lang = 'ko-KR'; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = false;
   rec.onresult = ev => {
@@ -436,9 +438,15 @@ function listen(){
     handle(alts, 'voice');
   };
   rec.onerror = ev => {
-    if (['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)) {
+    if (['not-allowed','service-not-allowed'].includes(ev.error) && !S.listenByUser && IS_SAFARI) {
+      // Safari는 사용자가 직접 누른 뒤에만 듣기 시작을 허용하는 경우가 있음: 자동 듣기 실패는 오류로 보지 않음
+      S.notice = '마이크 버튼을 누르고 말씀해 주세요.';
+      log('k', '[Safari] 자동 듣기 시작이 거부됨 → 버튼 누르기 안내');
+    } else if (['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)) {
       S.srOK = false;
-      S.notice = '이 화면에서는 마이크를 쓸 수 없어요. 내려받은 키오스크 파일을 Chrome에서 열면 음성 인식이 동작해요. 지금은 버튼이나 글자 입력으로 체험해 보세요.';
+      S.notice = IS_SAFARI
+        ? '마이크 권한이 없어요. 주소창의 "ㅇA" 또는 설정 아이콘 → 마이크를 "허용"으로 바꾼 뒤 새로고침해 주세요.'
+        : '이 화면에서는 마이크를 쓸 수 없어요. 내려받은 키오스크 파일을 Chrome에서 열면 음성 인식이 동작해요. 지금은 버튼이나 글자 입력으로 체험해 보세요.';
     } else if (ev.error === 'no-speech') {
       S.notice = (S.micReady && (S.peak || 0) < 0.01)
         ? `마이크로 소리가 거의 들어오지 않아요 (입력 장치: ${S.micLabel}). 맥의 시스템 설정 → 사운드 → 입력에서 쓰는 마이크가 맞는지 확인해 주세요.`
@@ -738,6 +746,12 @@ function matchOption(raw){
 /* ---------- 3단계: 온디바이스 LLM (Chrome 내장 Prompt API) ---------- */
 const LLM = { state: 'checking', engine: null, session: null, mlc: null, progress: '', webgpu: !!navigator.gpu };
 const WEBLLM_MODELS = { small:'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', mid:'Qwen2.5-1.5B-Instruct-q4f16_1-MLC' };
+async function pickWebLLMModel(which){
+  let f16 = true;
+  try { const ad = await navigator.gpu.requestAdapter(); f16 = !!ad && ad.features.has('shader-f16'); } catch(_) { f16 = false; }
+  const m = WEBLLM_MODELS[which] || WEBLLM_MODELS.small;
+  return f16 ? m : m.replace('q4f16_1', 'q4f32_1');
+}
 async function initLLM(){
   try {
     if ('LanguageModel' in window) {
@@ -755,9 +769,11 @@ async function loadWebLLM(which){
   LLM.state = 'loading'; LLM.progress = '라이브러리 불러오는 중'; renderMon();
   try {
     const mod = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm');
-    const engine = await mod.CreateMLCEngine(WEBLLM_MODELS[which] || WEBLLM_MODELS.small, {
+    const modelId = await pickWebLLMModel(which);
+    LLM.progress = modelId; renderMon();
+    const engine = await mod.CreateMLCEngine(modelId, {
       initProgressCallback: r => { LLM.progress = r.text.replace(/\[.*?\]/g,'').slice(0, 60); renderMon(); } });
-    LLM.mlc = engine; LLM.engine = 'webllm'; LLM.state = 'ready'; LLM.progress = WEBLLM_MODELS[which];
+    LLM.mlc = engine; LLM.engine = 'webllm'; LLM.state = 'ready'; LLM.progress = modelId;
     try { localStorage.setItem('kiosk-webllm', which); } catch(_){}
   } catch(err) { LLM.state = 'none'; LLM.progress = '불러오기 실패: ' + (err && err.message || err).toString().slice(0, 80); }
   renderMon();
@@ -874,8 +890,10 @@ function reset(keepMode){
   if (keepMode && S.mode) return begin(S.mode, '처음부터 다시 할게요. ');
   S.mode = null; render();
 }
+const IS_SAFARI = /safari/i.test(navigator.userAgent) && !/chrome|crios|fxios|edg|android/i.test(navigator.userAgent);
+function unlockTTS(){ try { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch(_){} }
 function begin(mode, p=''){
-  S.mode = mode;
+  S.mode = mode; unlockTTS();
   S.tts = mode === 'voice' ? true : S.tts;
   syncToggles();
   log('k', mode === 'voice' ? '— 말로 주문하기 시작 —' : '— 버튼으로 주문하기 시작 —');
@@ -951,7 +969,7 @@ function micHTML(){
     </div></div>`;
 }
 function bindMic(){
-  const m = $('mic'); if (m) m.onclick = () => S.listening ? stopListening() || renderMic() : listen();
+  const m = $('mic'); if (m) m.onclick = () => { unlockTTS(); S.listening ? (stopListening(), renderMic()) : listen(true); };
   const f = $('typer'); if (f) f.onsubmit = ev => {
     ev.preventDefault(); const v = $('typed').value.trim(); if (!v) return;
     const noise = +$('noise').value / 100;
@@ -984,6 +1002,7 @@ function renderMon(){
     : LLM.state === 'download' ? '규칙 → 유사도 (Chrome 내장 AI는 모델 다운로드 필요)' : `규칙 → 유사도${LLM.progress ? ' · ' + LLM.progress : ''}`;
   const wb = $('mWeb'); if (wb) wb.hidden = LLM.state === 'ready' || LLM.state === 'loading' || !LLM.webgpu;
   const wn = $('mWebNo'); if (wn) wn.hidden = LLM.webgpu;
+  const br = $('mBrowser'); if (br) br.textContent = `${IS_SAFARI ? 'Safari' : /crios/i.test(navigator.userAgent) ? 'Chrome (iOS)' : /chrome/i.test(navigator.userAgent) ? 'Chrome' : '기타'} · 음성인식 ${SR ? '지원' : '미지원'} · WebGPU ${LLM.webgpu ? '지원' : '미지원'}`;
   const d = S.draft;
   const cells = [['메뉴', d.menu && byId(MENU,d.menu).name], ['세트', d.set === undefined ? null : d.set ? '세트' : '단품'],
     ['사이드', d.side && byId(SIDES,d.side).name], ['음료', d.drink && byId(DRINKS,d.drink).name], ['크기', d.size === 'L' ? '라지' : d.size === 'M' ? '미디엄' : null], ['수량', d.qty]];
@@ -1023,7 +1042,7 @@ document.addEventListener('keydown', ev => {
   if (ev.target.tagName === 'INPUT') return;
   if (ev.key === '0') { ev.preventDefault(); return callStaff(); }
   if (/^[1-9]$/.test(ev.key) && S.mode && $('overlay').hidden) { ev.preventDefault(); return pickOption(+ev.key - 1); }
-  if (ev.key === ' ' && S.mode && LISTEN_STATES.has(S.state)) { ev.preventDefault(); S.listening ? (stopListening(), renderMic()) : listen(); }
+  if (ev.key === ' ' && S.mode && LISTEN_STATES.has(S.state)) { ev.preventDefault(); S.listening ? (stopListening(), renderMic()) : listen(true); }
 });
 
 syncToggles(); render(); initLLM();
